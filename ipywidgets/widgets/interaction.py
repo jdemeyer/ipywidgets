@@ -122,29 +122,36 @@ class interactive(VBox):
 
     Parameters
     ----------
-    __interact_f : function
+    f : function
         The function to which the interactive widgets are tied. The `**kwargs`
         should match the function signature.
-    __options : dict
+    options : dict, optional
         A dict of options. Currently, the only supported key is
         ``"manual"``.
     **kwargs : various, optional
         An interactive widget is created for each keyword argument that is a
         valid widget abbreviation.
 
-    Note that the first two parameters intentionally start with a double
-    underscore to avoid being mixed up with keyword arguments passed by
-    ``**kwargs``.
+    Note that the ``f`` and ``options`` parameters (as well as ``self``)
+    are handled as ``*args`` to avoid being mixed up with keyword
+    arguments passed by ``**kwargs``.
     """
-    def __init__(self, __interact_f, __options={}, **kwargs):
+    def __init__(*args, **kwargs):
+        # Use *args to avoid name clash with keyword arguments
+        if len(args) < 3:
+            (self, f) = args
+            options = {}
+        else:
+            (self, f, options) = args
+
         VBox.__init__(self, _dom_classes=['widget-interact'])
         self.result = None
         self.args = []
         self.kwargs = {}
 
-        self.f = f = __interact_f
+        self.f = f
         self.clear_output = kwargs.pop('clear_output', True)
-        self.manual = __options.get("manual", False)
+        self.manual = options.get("manual", False)
 
         new_kwargs = self.find_abbreviations(kwargs)
         # Before we proceed, let's make sure that the user has passed a set of args+kwargs
@@ -401,7 +408,7 @@ class _InteractFactory(object):
         """
         return self.cls(f, self.opts, **self.kwargs)
 
-    def __call__(self, __interact_f=None, **kwargs):
+    def __call__(*args, **kwargs):
         """
         Make the given function interactive by adding and displaying
         the corresponding :class:`interactive` widget.
@@ -412,16 +419,20 @@ class _InteractFactory(object):
 
         Returns
         -------
-        f : __interact_f with interactive widget attached to it.
+        f : the given function with interactive widget attached to it.
 
         Parameters
         ----------
-        __interact_f : function
+        f : function, optional
             The function to which the interactive widgets are tied. The `**kwargs`
             should match the function signature. Passed to :func:`interactive()`
         **kwargs : various, optional
             An interactive widget is created for each keyword argument that is a
             valid widget abbreviation. Passed to :func:`interactive()`
+
+        Note that the ``f`` parameter (as well as ``self``)
+        is handled as ``*args`` to avoid being mixed up with keyword
+        arguments passed by ``**kwargs``.
 
         Examples
         --------
@@ -460,6 +471,12 @@ class _InteractFactory(object):
             def square(num=2):
                 print("{} squared is {}".format(num, num*num))
         """
+        # Use *args to avoid name clash with keyword arguments
+        if len(args) < 2:
+            (self,) = args
+        else:
+            (self, f) = args
+
         # If kwargs are given, replace self by a new
         # _InteractFactory with the updated kwargs
         if kwargs:
@@ -467,9 +484,8 @@ class _InteractFactory(object):
             kw.update(kwargs)
             self = type(self)(self.cls, self.opts, kw)
 
-        f = __interact_f
-        if f is None:
-            # This branch handles the case 3
+        if len(args) < 2:
+            # This branch handles the case 3 (only kwargs given)
             # @interact(a=30, b=40)
             # def f(*args, **kwargs):
             #     ...
@@ -488,8 +504,10 @@ class _InteractFactory(object):
             f.widget = w
         except AttributeError:
             # some things (instancemethods) can't have attributes attached,
-            # so wrap in a lambda
-            f = lambda *args, **kwargs: __interact_f(*args, **kwargs)
+            # so wrap in a normal function
+            f_ = f
+            def f(*args, **kwargs):
+                return f_(*args, **kwargs)
             f.widget = w
         display(w)
         return f

@@ -362,6 +362,12 @@ def test_default_out_of_bounds():
         ),
     )
 
+def test_self():
+    "Check that 'self' can be used as parameter name"
+    @interact(self="Hello World")
+    def f(self):
+        pass
+
 def test_annotations():
     @annotate(n=10, f=widgets.FloatText())
     def f(n, f):
